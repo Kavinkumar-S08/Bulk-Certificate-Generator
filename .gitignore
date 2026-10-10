@@ -1,13 +1,40 @@
+# Environment variables and secrets
 .env
+.env.*
+!.env.example
+
+# Python virtual environments
 .venv/
 venv/
+env/
+
+# Python cache
 __pycache__/
 *.py[cod]
+
+# Testing and code quality
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
 .coverage
 htmlcov/
+
+# IDE and system files
 .idea/
 .vscode/
 .DS_Store
+Thumbs.db
+*.swp
+
+# Generated certificates
+generated_certificates/*
+!generated_certificates/.gitkeep
+
+# Logs and temporary files
+*.log
+logs/
+*.tmp
+
+# Local databases
+*.sqlite3
+*.db

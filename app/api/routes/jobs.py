@@ -6,6 +6,7 @@ from sqlalchemy import func, select
 from app.db.session import get_db
 from app.models import Certificate, GenerationJob
 from app.schemas.job import JobCreateRequest, JobCreateResponse, JobStatusResponse, CertificateListResponse, CertificateResult
+from app.workers.tasks import generate_certificate_task
 
 router = APIRouter(prefix="/api/jobs", tags=["Jobs"])
 
@@ -24,6 +25,7 @@ def create_job(
         status="queued",
     )
 
+    
     try:
         db.add(job)
         db.flush()
@@ -42,18 +44,32 @@ def create_job(
         db.commit()
         db.refresh(job)
 
-        return JobCreateResponse(
-            job_id=job.id,
-            status=job.status,
-            total_certificates=len(certificates),
-        )
-
     except SQLAlchemyError as exc:
         db.rollback()
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=500,
             detail="Failed to create certificate job",
         ) from exc
+
+    # Enqueue only after the database transaction commits.
+    try:
+        for certificate in certificates:
+            generate_certificate_task.delay(certificate.id)
+
+    except Exception as exc:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                f"Job {job.id} was created, but task dispatch may be "
+                "incomplete. Check the job status before retrying."
+            ),
+        ) from exc
+
+    return JobCreateResponse(
+        job_id=job.id,
+        status=job.status,
+        total_certificates=len(certificates),
+    )
 
 
 @router.get("/{job_id}", response_model=JobStatusResponse)
